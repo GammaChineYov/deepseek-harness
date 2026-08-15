@@ -34,6 +34,11 @@ export interface MessageIconActionsProps {
    * built-in copy and branch controls.
    */
   extraActions?: ReactNode
+  /**
+   * Meta content appended inside the clock label after the run-time facts
+   * (the plugin-provided stat line); omitted for user chrome.
+   */
+  afterClock?: ReactNode
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -45,7 +50,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, className,
-  extraActions, t,
+  extraActions, afterClock, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -105,6 +110,7 @@ export function MessageIconActions({
           {t('message.tokensPerSecond', { tps: formatTokensPerSecond(tokensPerSecond) })}
         </>
       )}
+      {afterClock}
     </span>
   )
   return (
