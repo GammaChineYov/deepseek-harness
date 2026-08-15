@@ -1,7 +1,7 @@
 /** Frame-wide dynamic Plugin inventory, approvals, versions, and lifecycle actions. */
 
-import { useEffect, useRef, useState } from 'react'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ButtonHTMLAttributes, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import {
   IconCheckOutline16, IconCloseOutline16, IconCordisPluginOutline14, IconPlayOutline16,
   IconStopFill16, IconTrashOutline16, Tooltip,
@@ -98,6 +98,182 @@ function DoubleCheckIcon() {
     <span className={css.doubleCheck} aria-hidden>
       <IconCheckOutline16 size={12} />
       <IconCheckOutline16 size={12} />
+    </span>
+  )
+}
+
+/**
+ * Version dropdown that replaces the native select: each option carries a
+ * hover/focus tooltip with that Package's purpose, so switching the visible
+ * version is a read of the version history, not a blind pick. The menu is
+ * position:fixed off the trigger rect (re-measured on scroll/resize), because
+ * the panel body scrolls and would clip an absolutely positioned list.
+ */
+function VersionPicker({
+  packages,
+  value,
+  disabled,
+  onChange,
+  t,
+}: {
+  packages: CordisInventoryRow['packages']
+  value: CordisDynamicPackageId
+  disabled: boolean
+  onChange: (packageId: CordisDynamicPackageId) => void
+  t: CordisPanelProps['t']
+}) {
+  const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number; width: number } | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const measure = useCallback(() => {
+    const el = triggerRef.current
+    if (el === null) return
+    const r = el.getBoundingClientRect()
+    setMenuPos({
+      left: r.left,
+      top: r.bottom + 4,
+      width: Math.min(r.width, window.innerWidth - r.left - 8),
+    })
+  }, [])
+
+  const close = useCallback(() => {
+    setOpen(false)
+    setMenuPos(null)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    measure()
+    const onScroll = () => measure()
+    const onResize = () => measure()
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return
+      if (triggerRef.current?.contains(e.target as Node)) return
+      close()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
+    document.addEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, measure, close])
+
+  // Flip the menu above the trigger when it would run off the bottom edge.
+  useLayoutEffect(() => {
+    if (!open || menuPos === null) return
+    const menu = menuRef.current
+    if (menu === null) return
+    const r = menu.getBoundingClientRect()
+    if (r.bottom <= window.innerHeight - 8) return
+    const btn = triggerRef.current
+    if (btn === null) return
+    const b = btn.getBoundingClientRect()
+    const top = Math.max(8, b.top - 4 - r.height)
+    if (top !== menuPos.top) {
+      setMenuPos(prev => prev === null ? prev : { ...prev, top })
+    }
+  }, [open, menuPos])
+
+  // A busy row (pending lifecycle action) disables the trigger; drop any open
+  // menu so its stale options cannot be picked mid-operation.
+  useEffect(() => {
+    if (disabled) close()
+  }, [disabled, close])
+
+  const selected = packages.find(pkg => pkg.packageId === value)
+
+  const onMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    const options = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[data-cordis-version-option]') ?? [],
+    )
+    if (options.length === 0) return
+    const idx = options.indexOf(document.activeElement as HTMLButtonElement)
+    const next = e.key === 'ArrowDown' ? Math.min(idx + 1, options.length - 1) : Math.max(idx - 1, 0)
+    options[next]?.focus()
+  }
+
+  return (
+    <span
+      className={css.versionControl}
+      onBlur={(e) => {
+        const next = e.relatedTarget as Node | null
+        if (next === null) return
+        if (menuRef.current?.contains(next)) return
+        if (triggerRef.current?.contains(next)) return
+        close()
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className={css.versionButton}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        data-cordis-version-trigger
+        onClick={() => setOpen(v => !v)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+          e.preventDefault()
+          setOpen(true)
+        }}
+      >
+        <span className={css.versionButtonText}>
+          {selected === undefined ? value : `${selected.name} · ${selected.packageId}`}
+        </span>
+        <span className={css.versionCaret} aria-hidden>▾</span>
+      </button>
+      {open && menuPos !== null && (
+        <div
+          ref={menuRef}
+          className={css.versionMenu}
+          role="listbox"
+          aria-label={t('panel.version')}
+          style={{ left: menuPos.left, top: menuPos.top, width: menuPos.width }}
+          onKeyDown={onMenuKeyDown}
+        >
+          {packages.map(pkg => (
+            <Tooltip
+              key={pkg.packageId}
+              label={pkg.purpose || t('purpose.missing')}
+              side="right"
+              maxWidth={360}
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={pkg.packageId === value}
+                className={css.versionOption}
+                data-cordis-version-option={pkg.packageId}
+                onClick={() => {
+                  onChange(pkg.packageId)
+                  close()
+                }}
+              >
+                <span className={css.versionOptionName}>{pkg.name}</span>
+                <span className={css.versionOptionId}>{pkg.packageId}</span>
+                {pkg.packageId === value && (
+                  <span className={css.versionCheck} aria-hidden>
+                    <IconCheckOutline16 size={12} />
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+      )}
     </span>
   )
 }
@@ -232,20 +408,18 @@ export function CordisPanel({
         {listed !== undefined && listed.packages.length > 1 && selectedPackageId !== undefined && (
           <label className={css.versionPicker}>
             <span>{t('panel.version')}</span>
-            <select
+            <VersionPicker
+              packages={listed.packages}
               value={selectedPackageId}
               disabled={busy}
-              onChange={(event) => {
+              onChange={(packageId) => {
                 setSelected(currentSelected => ({
                   ...currentSelected,
-                  [pluginId]: event.target.value as CordisDynamicPackageId,
+                  [pluginId]: packageId,
                 }))
               }}
-            >
-              {listed.packages.map(pkg => (
-                <option key={pkg.packageId} value={pkg.packageId}>{`${pkg.name} · ${pkg.packageId}`}</option>
-              ))}
-            </select>
+              t={t}
+            />
           </label>
         )}
         <div className={css.rowDetail}>
