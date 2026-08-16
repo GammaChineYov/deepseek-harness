@@ -1017,7 +1017,14 @@ export class LlmRuntime extends TypertRemoteService {
     })
   }
 
-  private registration(provider: string): AdapterRegistration {
+  /**
+   * Resolve one provider route's adapter registration. Public since 2026-08-15
+   * (local patch): dsh-vision-proxy needs it to wrap the real DeepSeek adapter
+   * behind its image-transcribing proxy route. Mirrors upstream rc.6, where
+   * this method was made public. Safe: internal callers use this.registration()
+   * unchanged; only visibility widened.
+   */
+  registration(provider: string): AdapterRegistration {
     const registration = this.adapters.get(provider)
     if (!registration) throw new LlmError(`no adapter registered for provider "${provider}"`, 'NO_ADAPTER')
     return registration
@@ -1206,7 +1213,7 @@ function detachDirectoryEntry(entry: LlmConfigurableProvider): LlmConfigurablePr
   }
 }
 
-interface AdapterRegistration {
+export interface AdapterRegistration {
   readonly adapter: LlmAdapter
   readonly provider: LlmProviderInfo
   readonly retryPolicy: ResolvedRetryPolicy
