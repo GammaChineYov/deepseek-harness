@@ -67,7 +67,9 @@
 
 .menu {
   position: absolute;
-  right: 0;
+  /* Anchor the left edge so fly-out width changes extend rightward from a
+     fixed origin instead of shunting the menu left/right on hover. */
+  left: 0;
   bottom: calc(100% + 8px);
   z-index: 20;
   display: flex;
@@ -135,25 +137,35 @@
   cursor: pointer;
 }
 
-.groups {
+/* Fly-out split: the provider column stays put while the model column
+   swaps its contents on hover/focus — the classic two-level menu. The model
+   column keeps a fixed width so swapping providers never resizes the card
+   (and with the left edge anchored, nothing shunts while it does). */
+.split {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.providerCol {
+  flex: 0 0 192px;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+}
+
+.modelCol {
+  flex: 0 0 224px;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
 }
 
-.group + .group {
-  margin-top: 4px;
-}
-
-.groupTitle {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 5px 8px 3px;
-  background: var(--dsw-specific-menu);
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
+/* The provider whose models the fly-out column shows; stays lit while the
+   mouse rests on the row (and follows keyboard focus). */
+.providerHover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .option {
