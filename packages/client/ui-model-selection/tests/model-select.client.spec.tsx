@@ -131,8 +131,50 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(trigger)
     expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    // A single provider skips the provider level straight to its models; the
+    // removed current model never appears anywhere.
     expect(screen.queryByText('removed-model')).toBeNull()
     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+  })
+
+  it('fly-out column swaps to the hovered provider when several exist', () => {
+    const groups = [
+      {
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        models: [{ id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash' }],
+      },
+      {
+        id: 'openai',
+        name: 'OpenAI',
+        models: [{ id: 'gpt-5', name: 'GPT-5' }],
+      },
+    ]
+    const directory = createSnapshotStore<ModelDirectoryState>(state({ groups }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    // Both providers stay visible; the fly-out column defaults to the current
+    // provider's models.
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toContain('DeepSeek1 个模型')
+    expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+
+    // Hovering the other provider swaps the fly-out column without any
+    // navigation — no back row, both provider rows remain on screen.
+    fireEvent.mouseEnter(screen.getByRole('menuitemradio', { name: /OpenAI/ }))
+    expect(screen.getByRole('menuitemradio', { name: 'GPT-5' })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeNull()
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['DeepSeek1 个模型', 'OpenAI1 个模型', 'GPT-5'])
   })
 
   it('announces a rejected selection as a transient toast and keeps the in-menu strip for loads', async () => {
@@ -160,6 +202,7 @@ describe('ModelSelect reasoning effort', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    // Single provider: the provider level is skipped, models appear directly.
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
     const toast = await screen.findByRole('alert')
     expect(toast.textContent).toContain('模型操作失败：model-unavailable: session already contains images')
