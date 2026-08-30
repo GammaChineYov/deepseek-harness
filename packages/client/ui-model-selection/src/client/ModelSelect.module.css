@@ -66,12 +66,14 @@
 }
 
 .menu {
-  position: absolute;
-  /* Anchor the left edge so fly-out width changes extend rightward from a
-     fixed origin instead of shunting the menu left/right on hover. */
-  left: 0;
-  bottom: calc(100% + 8px);
-  z-index: 20;
+  /* Portaled to document.body and fixed-positioned from the trigger rect by
+     ModelSelect (see MENU_MEASURE_STYLE / useLayoutEffect placement), so it
+     escapes the composer seat's sticky z-index:7 stacking context — which sits
+     below the sidebar's z-index:50 and would otherwise crop the fly-out. The
+     100 layer matches the popover/tooltip layer (ui-primitives Menu/HoverCard)
+     and clears the sidebar (50/55/60) while staying under modals (1000). */
+  position: fixed;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   /* Let the visible pane's rows set the card width, but keep pathological ids
@@ -271,3 +273,4 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-tertiary);
 }
+

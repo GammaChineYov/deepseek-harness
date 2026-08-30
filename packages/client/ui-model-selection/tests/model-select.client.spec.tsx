@@ -258,4 +258,53 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.queryByRole('button')).toBeNull()
     expect(load).not.toHaveBeenCalled()
   })
+
+  it('selects a single-model provider directly on its click (no fly-out hop)', async () => {
+    const groups = [
+      { id: 'single', name: 'Single-Provider', models: [{ id: 'only', name: 'Only-Model' }] },
+      {
+        id: 'multi',
+        name: 'Multi-Provider',
+        models: [
+          { id: 'm1', name: 'M-One' },
+          { id: 'm2', name: 'M-Two' },
+        ],
+      },
+    ]
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      groups,
+      current: { provider: 'multi', model: 'm1' },
+    }))
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set(state({ groups, current: selection }))
+      return true
+    })
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+
+    // A single-model provider selects straight from its row — no trip to the
+    // fly-out model column for its only entry.
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Single-Provider/ }))
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({ provider: 'single', model: 'only' })
+    })
+
+    // A multi-model provider still drills in: its row only reveals the fly-out,
+    // it does not submit a selection of its own.
+    fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Multi-Provider/ }))
+    expect(select).not.toHaveBeenCalledWith({ provider: 'multi', model: 'm1' })
+    expect(select).not.toHaveBeenCalledWith({ provider: 'multi', model: 'm2' })
+  })
 })
+

@@ -12,9 +12,10 @@
  * card; the in-menu strip with Retry remains the catalog-load surface.
  */
 import {
-  useEffect, useId, useMemo, useRef, useState, useSyncExternalStore,
-  type KeyboardEvent, type FocusEvent,
+  useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
+  type CSSProperties, type KeyboardEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
@@ -36,6 +37,16 @@ interface EffortChoice {
   label: string
 }
 
+// Portal placement: the menu is rendered into document.body so it escapes
+// the composer seat's sticky z-index:7 stacking context (which sits below the
+// sidebar's z-index:50 and would otherwise crop the fly-out). The list is
+// hidden-but-laid-out at a fixed origin first so its real width/height can be
+// measured, then it is fixed-positioned above the trigger (mirrors the Menu
+// primitive's portal mode).
+const MENU_MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
+const MENU_OVER_GAP = 8
+const MENU_VIEWPORT_MARGIN = 12
+
 /**
  * Render the composer model seat.
  * @param props - owner share (locked) + injected face (shared directory
@@ -52,6 +63,7 @@ export function ModelSelect(
   )
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
+  const [menuPlacement, setMenuPlacement] = useState<CSSProperties | null>(null)
   // Which provider's model list the fly-out column shows; null before the
   // user picks a provider (root "Model" opens the provider list first).
   const [activeProvider, setActiveProvider] = useState<string | null>(null)
@@ -64,6 +76,7 @@ export function ModelSelect(
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
 
@@ -112,11 +125,44 @@ export function ModelSelect(
   useEffect(() => {
     if (!open) return
     const closeOutside = (event: MouseEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      // The portaled menu lives outside the anchor subtree; both must count as
+      // "inside" or a click on a row would close the menu before its click lands.
+      if (rootRef.current?.contains(target) === true) return
+      if (menuRef.current?.contains(target) === true) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', closeOutside)
     return () => { document.removeEventListener('mousedown', closeOutside) }
   }, [open])
+
+  // Portal mode: fixed-position the menu above the trigger from its rect, and
+  // re-place when a pane switch changes the list's height; keep it inside the
+  // viewport. Re-arms on scroll/resize (capture phase catches nested panes).
+  useLayoutEffect(() => {
+    if (!open) { setMenuPlacement(null); return }
+    const place = (): void => {
+      const r = triggerRef.current?.getBoundingClientRect() ?? null
+      if (r === null) return
+      const el = menuRef.current
+      const menuWidth = el?.offsetWidth ?? 0
+      const menuHeight = el?.offsetHeight ?? 0
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      let x = r.left
+      let y = r.top - menuHeight - MENU_OVER_GAP
+      if (menuWidth > 0) x = Math.min(Math.max(x, MENU_VIEWPORT_MARGIN), vw - menuWidth - MENU_VIEWPORT_MARGIN)
+      if (menuHeight > 0) y = Math.min(Math.max(y, MENU_VIEWPORT_MARGIN), vh - menuHeight - MENU_VIEWPORT_MARGIN)
+      setMenuPlacement({ left: x, top: y })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [open, pane])
 
   if (!available) return null
 
@@ -155,11 +201,6 @@ export function ModelSelect(
       event.preventDefault()
       moveFocus(event.key === 'ArrowDown' ? 1 : -1)
     }
-  }
-
-  const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
-    if (event.relatedTarget instanceof Node && rootRef.current?.contains(event.relatedTarget)) return
-    close()
   }
 
   const settleSelection = (accepted: boolean): void => {
@@ -219,7 +260,7 @@ export function ModelSelect(
   }
 
   return (
-    <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
+    <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown}>
       <button
         ref={triggerRef}
         type="button"
@@ -243,13 +284,16 @@ export function ModelSelect(
         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={menuRef}
           id={`${id}-menu`}
           className={css.menu}
           role="menu"
           aria-label={t('menu.aria')}
           aria-busy={state.status === 'loading' || busy}
+          onKeyDown={onRootKeyDown}
+          style={menuPlacement ?? MENU_MEASURE_STYLE}
         >
           {pane === 'root' && (
             <>
@@ -321,7 +365,21 @@ export function ModelSelect(
                             disabled={busy}
                             onMouseEnter={() => { setActiveProvider(provider.id) }}
                             onFocus={() => { setActiveProvider(provider.id) }}
-                            onClick={() => { setActiveProvider(provider.id) }}
+                            onClick={() => {
+                              // A single-model provider selects directly - no
+                              // need to visit the fly-out model column for its
+                              // only entry. Multi-model providers still drill in.
+                              if (provider.models.length === 1) {
+                                const onlyModel = provider.models[0]
+                                if (onlyModel !== undefined) {
+                                  choose({ provider: provider.id, model: onlyModel.id })
+                                } else {
+                                  setActiveProvider(provider.id)
+                                }
+                              } else {
+                                setActiveProvider(provider.id)
+                              }
+                            }}
                           >
                             <span className={css.optionCopy}>
                               <span className={css.modelName}>{provider.name}</span>
@@ -406,7 +464,8 @@ export function ModelSelect(
                 ))}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
       {toast !== null && (
         <Toast
@@ -420,3 +479,4 @@ export function ModelSelect(
     </div>
   )
 }
+
