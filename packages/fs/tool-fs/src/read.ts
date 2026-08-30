@@ -49,15 +49,17 @@ function parsePositiveInteger(value: number, name: string): number {
 
 /**
  * Validate value constraints the schema DSL can't express. `maxLimit` is the deployment's line cap.
- * @param args - the schema-validated raw tool arguments; `offset`/`limit` must be positive integers when given.
- * @param maxLimit - the configured line cap: both the default `limit` and the largest one accepted.
- * @returns the validated input with `offset` defaulted to 1 and `limit` to `maxLimit`.
+ * @param args - the schema-validated raw tool arguments; `offset` must be a positive integer and `limit`
+ * must be a positive integer when given (a non-positive `limit` is rejected, never clamped).
+ * @param maxLimit - the configured line cap: the default `limit` when omitted, and the ceiling a requested
+ * `limit` is clamped to when larger. A requested value above the cap is capped, not rejected — the caller
+ * still gets the bounded window plus the continuation footer that read renders.
+ * @returns the validated input with `offset` defaulted to 1 and `limit` defaulting to / clamped at `maxLimit`.
  */
 export function parseReadArgs(args: { file_path: string; offset?: number; limit?: number }, maxLimit: number): ReadInput {
   if (args.file_path.trim().length === 0) throw new Error('file_path must be a non-empty string')
   const offset = args.offset === undefined ? 1 : parsePositiveInteger(args.offset, 'offset')
-  const limit = args.limit === undefined ? maxLimit : parsePositiveInteger(args.limit, 'limit')
-  if (limit > maxLimit) throw new Error(`limit must be less than or equal to ${maxLimit}`)
+  const limit = Math.min(args.limit === undefined ? maxLimit : parsePositiveInteger(args.limit, 'limit'), maxLimit)
   return { filePath: args.file_path, offset, limit }
 }
 
@@ -195,8 +197,10 @@ export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
     // the title bare instead of smuggling config into this pure presenter.
     presentCall(args): GenericCallView {
       const { offset, limit } = args
-      const window = limit !== undefined && limit > 0
-        ? ` (${offset ?? 1} - ${(offset ?? 1) + limit - 1})`
+      // Mirror the execution clamp so the call title never advertises a window wider than the cap.
+      const capped = limit !== undefined ? Math.min(limit, caps.limit) : undefined
+      const window = capped !== undefined && capped > 0
+        ? ` (${offset ?? 1} - ${(offset ?? 1) + capped - 1})`
         : offset !== undefined ? ` (from line ${offset})` : ''
       return {
         card: 'generic',

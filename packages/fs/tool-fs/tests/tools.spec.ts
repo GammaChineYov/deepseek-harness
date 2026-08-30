@@ -260,11 +260,15 @@ describe('read tool', () => {
     expect(text(result)).toContain('tool execution arguments must be losslessly JSON-serializable')
   })
 
-  it('rejects a limit above the cap', async () => {
-    const { ctx } = await setup()
+  it('clamps a limit above the cap to the configured maximum instead of rejecting', async () => {
+    const { ctx, fs } = await setup()
+    fs.files.set('key:a.txt', Array.from({ length: 2500 }, (_, i) => `line${i + 1}`).join('\n'))
     const result = await call(ctx, 'read', { file_path: 'a.txt', limit: 99999 })
-    expect(result.isError).toBe(true)
-    expect(text(result)).toContain('less than or equal to 2000')
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected read success')
+    expect(result.value).toMatchObject({ path: '/abs/a.txt', offset: 1, totalLines: 2500 })
+    expect(text(result)).toContain('1: line1')
+    expect(text(result)).toContain('(Showing lines 1-2000 of 2500. Use offset=2001 to continue.)')
   })
 
   it('rejects a blank file_path', async () => {
@@ -705,8 +709,10 @@ describe('read caps are plugin config', () => {
     const result = await call(ctx, 'read', { file_path: 'a.txt' })
     expect(text(result)).toContain('(Showing lines 1-2 of 4. Use offset=3 to continue.)')
     const overCap = await call(ctx, 'read', { file_path: 'a.txt', limit: 3 })
-    expect(overCap.isError).toBe(true)
-    expect(text(overCap)).toContain('less than or equal to 2')
+    expect(overCap.isError).toBe(false)
+    if (overCap.isError) throw new Error('expected read success')
+    expect(overCap.value).toMatchObject({ path: '/abs/a.txt', offset: 1, totalLines: 4 })
+    expect(text(overCap)).toContain('(Showing lines 1-2 of 4. Use offset=3 to continue.)')
     const readSchema = ctx.tools.schemas().find(s => s.name === 'read')
     expect(JSON.stringify(readSchema)).toContain('Defaults to 2.')
   })
