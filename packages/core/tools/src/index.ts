@@ -664,6 +664,16 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
+  /**
+   * Per-`run_code` sub-dispatch budget (default 2000).
+   * A single `run_code` program that issues more sub-call tool dispatches is
+   * aborted with an error naming this limit and how to raise it. The default is
+   * far above any well-formed program's need, so behavior is unchanged until a
+   * program would otherwise flood the session log with an unbounded loop of
+   * sub-calls; raise it when a legitimate program needs more. Must be a
+   * positive integer.
+   */
+  maxSubCallsPerRun?: number
 }
 
 /**
@@ -764,6 +774,9 @@ interface FusedToolSignal {
   dispose(): void
 }
 
+/** Default per-`run_code` sub-dispatch budget: far above any well-formed program. */
+const DEFAULT_MAX_SUB_CALLS_PER_RUN = 2_000
+
 /** Resolve the run_code overlap cap at the owning config boundary (direct construction bypasses the Loader schema). */
 function resolveMaxParallelSubCalls(value: number | undefined): number {
   const maxParallelSubCalls = value ?? 10
@@ -771,6 +784,15 @@ function resolveMaxParallelSubCalls(value: number | undefined): number {
     throw new Error('maxParallelSubCalls must be a positive integer')
   }
   return maxParallelSubCalls
+}
+
+/** Resolve the per-run_code sub-dispatch budget at the owning config boundary (direct construction bypasses the Loader schema). */
+function resolveMaxSubCallsPerRun(value: number | undefined): number {
+  const maxSubCallsPerRun = value ?? DEFAULT_MAX_SUB_CALLS_PER_RUN
+  if (!Number.isInteger(maxSubCallsPerRun) || maxSubCallsPerRun < 1) {
+    throw new Error('maxSubCallsPerRun must be a positive integer')
+  }
+  return maxSubCallsPerRun
 }
 
 /**
@@ -783,6 +805,7 @@ export class ToolRuntime extends Service {
   static Config: z<Config> = z.object({
     mode: z.union(['native', 'ptc', 'both'] as const).default('native'),
     maxParallelSubCalls: z.natural().min(1).default(10),
+    maxSubCallsPerRun: z.natural().min(1).default(DEFAULT_MAX_SUB_CALLS_PER_RUN),
   })
 
   /** Internal staged view consumed by `dsh-agent-loop`'s parallel scheduler. */
@@ -808,6 +831,7 @@ export class ToolRuntime extends Service {
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
   private readonly defaultMode: ToolPresentationMode
   private readonly maxParallelSubCalls: number
+  private readonly maxSubCallsPerRun: number
   /**
    * Reserved presentation transport, kept outside the filterable registration
    * layers. Built on first need rather than at construction: which agents run
@@ -822,6 +846,7 @@ export class ToolRuntime extends Service {
     // optional-input type for direct (non-Loader) construction in tests.
     this.defaultMode = config.mode ?? 'native'
     this.maxParallelSubCalls = resolveMaxParallelSubCalls(config.maxParallelSubCalls)
+    this.maxSubCallsPerRun = resolveMaxSubCallsPerRun(config.maxSubCallsPerRun)
     ctx.systemPrompt.tools(context => this.wireSchemas(context.scope))
     if (this.defaultMode !== 'native') {
       ctx.systemPrompt.section(this.collapseSection())
@@ -919,6 +944,7 @@ export class ToolRuntime extends Service {
       // the transport for an agent that chose code.
       peekRuntime: () => this.ctx.get('codeRuntime'),
       maxParallel: this.maxParallelSubCalls,
+      maxSubCalls: this.maxSubCallsPerRun,
       shapeDispatchLog: dispatch => this.shapeDispatchLog(dispatch),
     })
     return this.ptcTransport

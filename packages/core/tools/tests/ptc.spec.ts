@@ -44,6 +44,7 @@ class FakeRuntime extends CodeRuntime {
 interface SetupOptions {
   mode?: Config['mode']
   maxParallelSubCalls?: number
+  maxSubCallsPerRun?: number
   runtime?: false | { language?: string }
   toolOrder?: string[]
 }
@@ -51,7 +52,7 @@ interface SetupOptions {
 async function setup(options: SetupOptions = {}) {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt, { ...options.toolOrder ? { toolOrder: options.toolOrder } : {} })
-  await ctx.plugin(ToolRuntime, { mode: options.mode ?? 'ptc', ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {} })
+  await ctx.plugin(ToolRuntime, { mode: options.mode ?? 'ptc', ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {}, ...options.maxSubCallsPerRun !== undefined ? { maxSubCallsPerRun: options.maxSubCallsPerRun } : {} })
   let runtime: FakeRuntime | undefined
   if (options.runtime !== false) {
     await ctx.plugin(FakeRuntime, options.runtime ?? {})
@@ -1874,5 +1875,46 @@ describe('per-agent presentation', () => {
 
     await expect(systemPrompt.assemble({ scope: agent }))
       .rejects.toThrow('mode "both" requires a code runtime')
+  })
+})
+
+describe('the maxSubCallsPerRun sub-dispatch budget', () => {
+  it('aborts a program that exceeds the budget and refuses further dispatches', async () => {
+    const { ctx, runtime } = await setup({ mode: 'ptc', maxSubCallsPerRun: 3 })
+    const calls = registerEcho(ctx)
+    const { agent, events } = fakeAgent()
+    runtime.behavior = async (request) => {
+      const tools = request.bindings[0]!.functions
+      let failure: unknown
+      for (let i = 0; i < 6 && failure === undefined; i++) {
+        try { await tools.echo!({ value: `v${i}` }) } catch (error) { failure = error }
+      }
+      if (failure !== undefined) throw failure
+      return { logs: [], value: 'unreachable' }
+    }
+    const result = await runCode(ctx, 'program', { agent })
+    expect(result.isError).toBe(true)
+    const message = result.error?.message ?? ''
+    expect(message).toContain('maxSubCallsPerRun=3')
+    expect(message).toContain('Raise maxSubCallsPerRun')
+    // The fourth and later dispatches never ran or were logged.
+    expect(calls).toHaveLength(3)
+    expect(events.filter(event => event.type === 'tool/code-dispatch')).toHaveLength(3)
+  })
+
+  it('leaves a program under the budget undisturbed', async () => {
+    const { ctx, runtime } = await setup({ mode: 'ptc', maxSubCallsPerRun: 4 })
+    const calls = registerEcho(ctx)
+    const { agent, events } = fakeAgent()
+    runtime.behavior = async (request) => {
+      const tools = request.bindings[0]!.functions
+      for (let i = 0; i < 3; i++) await tools.echo!({ value: `v${i}` })
+      return { logs: [], value: 'done' }
+    }
+    const result = await runCode(ctx, 'program', { agent })
+    expect(result.isError).toBe(false)
+    if (result.isError) throw new Error('expected success')
+    expect(calls).toHaveLength(3)
+    expect(events.filter(event => event.type === 'tool/code-dispatch')).toHaveLength(3)
   })
 })
