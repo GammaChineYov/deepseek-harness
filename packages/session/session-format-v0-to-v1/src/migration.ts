@@ -95,7 +95,8 @@ function normalizeReleasedV0Event(
   const steering = normalizeLegacySteering(header, sessionId)
   const retry = normalizeLegacyRetry(steering, sessionId, state.retryIds)
   const compaction = normalizeLegacyCompaction(retry, sessionId, state)
-  const message = normalizeLegacyMessage(compaction, sessionId, state.messageIds)
+  const descriptor = normalizeLegacyDescriptorVersion(compaction, sessionId)
+  const message = normalizeLegacyMessage(descriptor, sessionId, state.messageIds)
   if (message.type !== 'assistant/chunk') assertReleasedEventPayload(message, 0)
   const messageId = eventMessageId(message)
   if (messageId !== undefined) state.messageIds.set(message.seq, messageId)
@@ -116,6 +117,30 @@ function normalizeLegacyCompactionType(event: SessionFormatEvent): SessionFormat
     default:
       return event
   }
+}
+
+/**
+ * Admit released v0 `subagent/descriptor` payloads stamped with descriptor
+ * version 2 (written by builds before the 2026-08-24 descriptor v3 switch).
+ * v3 is a strict superset of the v2 payload members, so promoting only the
+ * version number is lossless and lets the frozen validator and the current
+ * descriptor reader accept the record. Unknown future versions stay untouched
+ * and are refused by the frozen validator as unsupported.
+ * @param event - normalized v0 event.
+ * @param sessionId - source Session id, used only for diagnostics.
+ * @returns the event with a descriptor-v2 payload promoted to version 3.
+ */
+function normalizeLegacyDescriptorVersion(event: SessionFormatEvent, sessionId: string): SessionFormatEvent {
+  if (event.type !== 'subagent/descriptor') return event
+  const data = releasedV0Record(event.data, `subagent/descriptor ${event.seq} data`)
+  if (data['version'] !== 2) return event
+  const mode = data['mode']
+  if (mode !== 'one-shot' && mode !== 'continuable') {
+    throw new SessionFormatError(
+      `session ${JSON.stringify(sessionId)} contains subagent/descriptor ${event.seq} with an invalid mode`,
+    )
+  }
+  return { ...event, data: { ...data, version: 3 } }
 }
 
 function assertSourceDeliveryMarker(
