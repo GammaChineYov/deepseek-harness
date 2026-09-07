@@ -49,40 +49,10 @@
   white-space: nowrap;
 }
 
-/* Effort value beside the model name (mock's 'High': same 13/20/500, caption
-   tone). Adaptive priority: the huge shrink factor makes the effort absorb
-   all deficit first — it ellipsizes away to nothing before the model name
-   loses a single pixel, and the chevron stays snug throughout. */
+/* Effort value beside the model name (mock's 'High': same 13/20/500, caption tone). */
 .triggerEffort {
-  flex-shrink: 1000;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-caption);
-}
-
-/* Stand-in for the whole text below the icon-only cut: the settings page's
-   Models glyph (IconDataOutline16), hidden while any text fits. */
-.triggerIcon {
-  display: none;
   flex: 0 0 auto;
-}
-
-/* Icon-only floor: past continuous shrink (effort ellipsizes away first, then
-   the name), a 360px composer row leaves the 45cqw cap too little for a
-   legible name, so the text yields to the Models glyph. Same anonymous
-   container as PermissionSelect's 460px cut (InputBar .row); the full name
-   stays reachable through the trigger's title and aria-label. */
-@container (max-width: 360px) {
-  .triggerIcon {
-    display: block;
-  }
-
-  .triggerLabel,
-  .triggerEffort {
-    display: none;
-  }
+  color: var(--dsw-alias-label-caption);
 }
 
 .chevron {
@@ -95,20 +65,23 @@
   transform: rotate(180deg);
 }
 
-/* Portaled to body and placed from the trigger rect by the component (the
-   Menu primitive's portal rules), so the sidebar and the columns' overflow
-   clips cannot crop it; z matches the primitive's .portal layer. */
 .menu {
-  position: fixed;
+  /* The panel is portaled to document.body and fixed-positioned by an inline
+     style (ModelSelect); only surface chrome and z-order live here. */
   z-index: 1100;
   display: flex;
   flex-direction: column;
+  /* Lay content out from the bottom edge (chip side) upward: pinned rows stay
+     against the chip, and leftover space sits above the content. */
+  justify-content: flex-end;
   /* Let the visible pane's rows set the card width, but keep pathological ids
      and narrow screens inside a bounded card where ellipsis remains. */
   width: max-content;
   min-width: min(240px, calc(100vw - 32px));
   max-width: min(420px, calc(100vw - 32px));
-  max-height: min(360px, calc(100vh - 96px));
+  /* Height cap is the viewport top (set inline to the space above the
+     trigger); taller content scrolls in the model column. */
+  max-height: calc(100vh - 96px);
   overflow: hidden;
   padding: 4px;
   /* Surface tokens match the Menu primitive card (ui-primitives
@@ -128,8 +101,13 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+/* Pinned rows in the bottom-anchored stack must never shrink: the split (the
+   only height-varying block) absorbs all the compression when the panel is
+   full, so the status rows above the columns and the recent/effort rows below
+   them keep their size instead of being crushed or pushed out of the card. */
 .status,
 .empty {
+  flex: none;
   padding: 10px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 13px;
@@ -138,6 +116,7 @@
 
 .error,
 .warning {
+  flex: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -167,7 +146,78 @@
   cursor: pointer;
 }
 
+/* Fly-out split: the provider column stays put while the model column swaps
+   its contents on hover/focus — no panel replacement, so no flicker.
+
+   Two properties make the two columns stable against hover:
+   - flex: 0 1 auto + min-height: 0 lets the split shrink (it is the only
+     compressible row of the fixed-height, bottom-anchored menu) so that when
+     the stack is taller than the panel the columns become height-constrained
+     and scroll internally instead of the card clipping its top.
+   - align-items: flex-end gives each column its own bottom-anchored height
+     instead of stretching both to the tallest column, so hovering a provider
+     whose model list is taller than the provider list grows only the model
+     column upward — the provider column and the pinned rows never shift. */
+.split {
+  display: flex;
+  flex: 0 1 auto;
+  min-height: 0;
+  align-items: flex-end;
+}
+
+/* Each column's visible band is its own content while it fits and the shared
+   leftover (100% of the split) once it would outgrow the panel, where
+   overflow-y scrolls. max-height: 100% resolves against the split's used
+   height, which flex shrinks to the leftover above the pinned rows. */
+.providerCol {
+  flex: 0 0 192px;
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+}
+
+.modelCol {
+  flex: 0 0 224px;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The provider whose models the fly-out column shows; stays lit while the
+   pointer rests on the row (and follows keyboard focus). */
+.providerHover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.description {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Recently used block on the root, above the two drill cells. */
+.recent {
+  flex: none;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.recentTitle {
+  padding: 5px 8px 3px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
 .groups {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
@@ -251,6 +301,7 @@
    #81858C tertiary tone, right chevron drilling into the sub-list. */
 .cell {
   box-sizing: border-box;
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
