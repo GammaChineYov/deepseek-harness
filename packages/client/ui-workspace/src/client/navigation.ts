@@ -164,6 +164,25 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       const workspace = this.workspaces.list.getSnapshot()
       const sessions = this.sessions.list.getSnapshot()
       if (workspace.phase !== 'ready' || sessions.phase !== 'ready') return
+      // Deep link: a `?session=<id>` target (the tray's recent-session jump)
+      // wins over both the persisted last-session restore and the default
+      // recent-workspace selection. Wait for the list to carry the id — select
+      // throws on an unknown session — then fall through to the default flow
+      // when the id is archived or otherwise absent.
+      const deepLinkTarget = readDeepLinkSessionId()
+      if (deepLinkTarget !== undefined) {
+        if (sessions.byId[deepLinkTarget] !== undefined) {
+          initial = 'done'
+          try {
+            this.sessions.open(deepLinkTarget)
+          } catch (reason: unknown) {
+            initial = 'waiting'
+            console.warn('deep link session open failed:', reason)
+          }
+          return
+        }
+        console.warn(`deep link session unavailable (archived or unknown): ${deepLinkTarget}`)
+      }
       if (sessions.current !== undefined) {
         initial = 'done'
         return
@@ -208,6 +227,25 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     return true
   }
 
+}
+
+const DEEP_LINK_PARAM = 'session'
+
+/**
+ * Read and consume a `?session=<id>` deep link (the tray's recent-session
+ * jump). The parameter is cleared from the URL once consumed so a later
+ * reload keeps the user's manual selection instead of re-forcing this session.
+ */
+function readDeepLinkSessionId(): SessionId | undefined {
+  const found = new URLSearchParams(window.location.search).get(DEEP_LINK_PARAM)
+  if (found === null || found.length === 0) return undefined
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete(DEEP_LINK_PARAM)
+    url.hash = ''
+    window.history.replaceState({}, '', url.toString())
+  } catch { /* history unavailable: parameter stays, handled once via the state machine */ }
+  return found as SessionId
 }
 
 /** Stable tie-breaking follows Host Workspace order. */
