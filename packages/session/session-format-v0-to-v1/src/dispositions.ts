@@ -102,12 +102,15 @@ export const RELEASED_V0_EVENT_DISPOSITIONS: Readonly<Record<string, ReleasedV0P
   'tool-workflow/agent-end': disposition(['runId', 'seq', 'outcome']),
   'tool-workflow/agent-start': disposition(['runId', 'seq', 'label', 'childId'], ['phase']),
   'tool-workflow/run-end': disposition(['runId', 'stopReason']),
-  'tool-workflow/run-start': disposition(['runId', 'name']),
+  // dsh-0.1.3-alpha.2-local: admit members released 0.1.2 clients wrote that the
+  // frozen 0.1.3 vocabulary omitted (local third-party workflow turn:null and
+  // tool-result presentation meta). Drop when upstream reconciles v0 vocabulary.
+  'tool-workflow/run-start': disposition(['runId', 'name'], ['turn'], ['turn']),
   'tool/call': disposition(['turn', 'step', 'callId', 'name', 'arguments']),
   'tool/code-dispatch': disposition(
     ['rootCallId', 'parentCallId', 'subCallId', 'name', 'arguments', 'isError', 'content'],
-    [],
-    ['arguments'],
+    ['meta'],
+    ['arguments', 'meta'],
   ),
   'tool/code-dispatch-start': disposition(
     ['rootCallId', 'parentCallId', 'subCallId', 'name', 'arguments'],
