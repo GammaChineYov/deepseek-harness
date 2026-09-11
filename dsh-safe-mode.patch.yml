@@ -1,0 +1,26 @@
+# dsh safe-mode overlay (generated 2026-09-09): disable all non-official bundle entries.
+# Whitelist = @deepseek-ai/dsh-base + @deepseek-ai/dsh-web-app + user's own cordis.patch.yml inserts.
+- id: dsh-external-workflow
+  disabled: true
+- id: better-sidebar
+  disabled: true
+- id: dsh-visualize
+  disabled: true
+- id: browser-playwright
+  disabled: true
+- id: tool-browser
+  disabled: true
+- id: agent-browser
+  disabled: true
+- id: unity-pool
+  disabled: true
+- id: ssh-tunnel
+  disabled: true
+- id: restart-service
+  disabled: true
+- id: memory-footer
+  disabled: true
+- id: dsh-super-injector
+  disabled: true
+- id: archify-skill-filesystem
+  disabled: true
