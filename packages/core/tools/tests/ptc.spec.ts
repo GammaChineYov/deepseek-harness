@@ -1899,7 +1899,7 @@ describe('the maxSubCallsPerRun sub-dispatch budget', () => {
     expect(message).toContain('Raise maxSubCallsPerRun')
     // The fourth and later dispatches never ran or were logged.
     expect(calls).toHaveLength(3)
-    expect(events.filter(event => event.type === 'tool/code-dispatch')).toHaveLength(3)
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch')).toHaveLength(3)
   })
 
   it('leaves a program under the budget undisturbed', async () => {
@@ -1915,6 +1915,6 @@ describe('the maxSubCallsPerRun sub-dispatch budget', () => {
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected success')
     expect(calls).toHaveLength(3)
-    expect(events.filter(event => event.type === 'tool/code-dispatch')).toHaveLength(3)
+    expect(events.filter(event => event.type === 'tool/ptc-dispatch')).toHaveLength(3)
   })
 })
