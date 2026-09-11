@@ -47,3 +47,14 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+
+# --- fork-local: machine-specific artifacts (never upstream) ---
+.dsh/
+.workbuddy/
+logs/
+docs/temp/
+.claude.bak-*/
+*.log
+*.err
+dsh-web-server.cmd.bak-*
+fix-dsh-node_modules.cmd.bak-*
