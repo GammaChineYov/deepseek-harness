@@ -615,6 +615,9 @@ const DEEP_LINK_PARAM = 'session'
  * reload keeps the user's manual selection instead of re-forcing this session.
  */
 function readDeepLinkSessionId(): SessionId | undefined {
+  // Client bundles also load under node test rigs and non-browser hosts, where
+  // no `window` exists; a deep link cannot be present there.
+  if (typeof window === 'undefined') return undefined
   const found = new URLSearchParams(window.location.search).get(DEEP_LINK_PARAM)
   if (found === null || found.length === 0) return undefined
   try {
