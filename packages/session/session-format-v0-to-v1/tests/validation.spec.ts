@@ -227,6 +227,25 @@ describe('released event and payload inventory', () => {
     }
   })
 
+  it('admits plugin-owned source members while keeping every core field rule', () => {
+    const pluginSource = {
+      kind: 'plugin', plugin: 'dsh-topic-relay', form: 'notice', summary: '[topic] topic/proxy-leader',
+      cause: 'post-updated', topicId: 'topic', postId: 'post', version: 1,
+    }
+    expect(() => { assertPayload('user/message', { ...userMessage, source: pluginSource }) }).not.toThrow()
+    for (const broken of [
+      { ...pluginSource, form: 'unknown' },
+      { ...pluginSource, form: 'snapshot' },
+      { ...pluginSource, form: 'relay', sections: [{ name: 'one', text: 'value' }] },
+      { kind: 'plugin', plugin: 'compact' },
+    ]) {
+      expect(() => { assertPayload('user/message', { ...userMessage, source: broken }) }, JSON.stringify(broken)).toThrow()
+    }
+    for (const missing of [{ kind: 'plugin' }, { plugin: 'plain' }, { kind: 'plugin', plugin: '' }]) {
+      expect(() => { assertPayload('user/message', { ...userMessage, source: missing }) }, JSON.stringify(missing)).toThrow()
+    }
+  })
+
   it('refuses an unexpected member on every known payload', () => {
     for (const [type, data] of Object.entries(validPayloads)) {
       const changed = { ...(data as Record<string, SessionFormatJsonValue>), unexpected: true }
