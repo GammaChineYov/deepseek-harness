@@ -13,6 +13,21 @@ export function releasedV0Record(value: unknown, label: string): Record<string, 
 }
 
 /**
+ * Require every named member while admitting members owned by the payload's own producer.
+ * @param record - candidate object.
+ * @param required - members that must exist.
+ * @param label - diagnostic subject.
+ */
+export function assertReleasedV0RequiredKeys(
+  record: Readonly<Record<string, unknown>>,
+  required: readonly string[],
+  label: string,
+): void {
+  const missing = required.find(key => !Object.hasOwn(record, key))
+  if (missing !== undefined) throw new SessionFormatError(`${label} lacks required member ${JSON.stringify(missing)}`)
+}
+
+/**
  * Require every named member and no member outside the optional list.
  * @param record - candidate object.
  * @param required - members that must exist.
