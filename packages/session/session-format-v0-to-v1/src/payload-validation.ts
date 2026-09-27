@@ -5,7 +5,7 @@ import type {
   SessionFormatEvent,
   SessionFormatJsonValue,
 } from '@deepseek-ai/dsh-session-format'
-import { assertReleasedV0Keys, releasedV0Record } from './validation-helpers.ts'
+import { assertReleasedV0Keys, assertReleasedV0RequiredKeys, releasedV0Record } from './validation-helpers.ts'
 
 type JsonRecord = Record<string, SessionFormatJsonValue>
 
@@ -630,10 +630,17 @@ function messageSourceValue(
   }
 }
 
+/**
+ * Validate a plugin-owned source: core checks the members it interprets and preserves the rest.
+ *
+ * Plugins own this payload, and no migration rewrites it, so a member core does not recognize is
+ * retained plugin metadata rather than schema drift. Refusing it here would reject a Session the
+ * writing generation already admitted (`dsh-topic-relay` records `cause`, `topicId`, `postId`).
+ * @param source - message source record.
+ * @param label - diagnostic subject.
+ */
 function pluginSourceValue(source: JsonRecord, label: string): void {
-  const optional = ['form', 'sections', 'summary']
-  if (source['plugin'] === 'compact') optional.push('compactionId', 'sourceCommandId')
-  assertReleasedV0Keys(source, ['kind', 'plugin'], optional, label)
+  assertReleasedV0RequiredKeys(source, ['kind', 'plugin'], label)
   nonEmptyString(source['plugin'], `${label} plugin`)
   if (source['plugin'] === 'compact') {
     nonEmptyString(source['compactionId'], `${label} compactionId`)
