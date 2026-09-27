@@ -42,6 +42,19 @@ describe('durable V3 admission failures', () => {
     expect(() => restoreReleasedV3Artifact(output, new Set())).not.toThrow()
   })
 
+  it('admits plugin-owned source members on spliced messages and preserves them verbatim', () => {
+    const source = {
+      kind: 'plugin', plugin: 'dsh-topic-relay', form: 'notice', summary: '[topic event] topic/proxy-leader',
+      cause: 'post-updated', topicId: 'topic', postId: 'post', version: 1,
+    }
+    const inserted = { ...user, id: 'relay-notice', source }
+    const spliced = event('agent/inbox/spliced', { target: 'next-turn', start: 1, inserted: [inserted] })
+    const output = migrate([...opening, spliced])
+    expect(output.events.find(value => value.type === 'agent/inbox/spliced')?.data)
+      .toEqual({ target: 'next-turn', start: 1, inserted: [inserted] })
+    expect(() => restoreReleasedV3Artifact(output, new Set())).not.toThrow()
+  })
+
   it('rejects non-dense source stage input rather than generating ambiguous identities', () => {
     const stage = sessionFormatV2ToV3.createStage({ sourceHeader: header, targetHeader: { ...header, version: 3 }, sourceInheritedEventCount: 0, sourceKind: 'decoded' })
     expect(() =>{  stage.transformEvent({ ...opening[0]!, seq: 1 }, new SessionFormatEventCollector()) }).toThrow(/dense/)
