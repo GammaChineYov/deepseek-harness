@@ -463,6 +463,18 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   }
 
   private async restoreSelection(workspaces: WorkspaceSnapshot, sessions: SessionListState): Promise<void> {
+    // Deep link: a `?session=<id>` target (the tray's recent-session jump)
+    // wins over the persisted last-session restore and the default flow.
+    // Fall through when the id is archived or otherwise absent.
+    const deepLinkTarget = readDeepLinkSessionId()
+    if (deepLinkTarget !== undefined) {
+      const linked = sessions.byId[deepLinkTarget]
+      if (linked !== undefined && !workspaces.archivedSessionIds.includes(deepLinkTarget)) {
+        this.replaceMain(deepLinkTarget, this.lifetime.signal, 'preserve')
+        return
+      }
+      console.warn(`deep link session unavailable (archived or unknown): ${deepLinkTarget}`)
+    }
     const saved = this.selection.getSnapshot()
     if (saved.subagentAddress !== undefined) {
       this.replaceMain(saved.subagentAddress, this.lifetime.signal, 'preserve')
@@ -593,6 +605,25 @@ function recentWorkspace(
     }
   }
   return selected
+}
+
+const DEEP_LINK_PARAM = 'session'
+
+/**
+ * Read and consume a `?session=<id>` deep link (the tray's recent-session
+ * jump). The parameter is cleared from the URL once consumed so a later
+ * reload keeps the user's manual selection instead of re-forcing this session.
+ */
+function readDeepLinkSessionId(): SessionId | undefined {
+  const found = new URLSearchParams(window.location.search).get(DEEP_LINK_PARAM)
+  if (found === null || found.length === 0) return undefined
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.delete(DEEP_LINK_PARAM)
+    url.hash = ''
+    window.history.replaceState({}, '', url.toString())
+  } catch { /* history unavailable: parameter stays, handled once per navigation */ }
+  return found as SessionId
 }
 
 export { UiWorkspaceService }
