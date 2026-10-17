@@ -434,6 +434,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.chat.turnTail': { kind: 'list'; scope: 'session'; owner: TurnTailOwnerProps }
     /**
+     * Meta content appended inside the closing Turn's IconActions clock label,
+     * after the run-time facts. Same owner currency as turnTail: entries
+     * derive a match from the engine-owned Turn and closing seq before
+     * mounting; an all-declined chain renders nothing, leaving the clock as-is.
+     */
+    'conversation.chat.messageMeta': { kind: 'chain'; scope: 'session'; owner: TurnTailOwnerProps }
+    /**
      * Ordered actions for one finalized assistant message. Each entry receives
      * the durable message id; a fresh `id` adds an action and reusing one replaces
      * that entry. With no entries, the standard action row remains unchanged.
