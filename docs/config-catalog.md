@@ -4244,6 +4244,16 @@ export interface Config {
    * restores strictly serial dispatch. Must be a positive integer.
    */
   maxParallelSubCalls?: number
+  /**
+   * Per-`run_code` sub-dispatch budget (default 2000).
+   * A single `run_code` program that issues more sub-call tool dispatches is
+   * aborted with an error naming this limit and how to raise it. The default is
+   * far above any well-formed program's need, so behavior is unchanged until a
+   * program would otherwise flood the session log with an unbounded loop of
+   * sub-calls; raise it when a legitimate program needs more. Must be a
+   * positive integer.
+   */
+  maxSubCallsPerRun?: number
 }
 
 /** How the registry presents its tools to the model (see {@link Config.mode}). */

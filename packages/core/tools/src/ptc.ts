@@ -311,6 +311,8 @@ export interface RunCodeBridgeOptions {
   peekRuntime: () => PtcRuntime | undefined
   /** The run's overlap cap for parallel-classified sub-calls (the registry passes its validated `maxParallelSubCalls`). */
   maxParallel: number
+  /** Per-run sub-dispatch budget: a program exceeding it is aborted instead of flooding the log. */
+  maxSubCalls: number
   /** Runs the contained `tools/ptc-dispatch-log` waterfall over one settled sub-dispatch (the registry's private invoker). */
   shapeDispatchLog: (dispatch: PtcDispatchLog) => Promise<ContentBlock[]>
 }
@@ -328,7 +330,7 @@ export interface RunCodeBridgeOptions {
  * @returns the registry-ready definition.
  */
 export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeOptions, ctx: Context): ToolDefinition {
-  const { requireRuntime, peekRuntime, maxParallel, shapeDispatchLog } = options
+  const { requireRuntime, peekRuntime, maxParallel, maxSubCalls, shapeDispatchLog } = options
   const stateOwners = new WeakMap<object, WeakSet<PtcRuntime>>()
   const calls = new PtcCalls(ctx)
   const definition = defineTool({
@@ -543,6 +545,20 @@ export function createRunCodeTool(registry: ToolRuntime, options: RunCodeBridgeO
           }
           const normalized = jsonNormalizeArgs(rawArgs)
           const n = ++dispatches
+          if (n > maxSubCalls) {
+            // The program's per-run sub-dispatch budget is exhausted. Stop the run
+            // now instead of letting an unbounded tool loop flood the session log
+            // with one dispatch record per call; nothing after this point may
+            // dispatch. Well-formed programs stay far below the budget, so only a
+            // genuinely runaway program reaches the error.
+            runController.abort(`run_code exceeded its per-run sub-dispatch budget of ${String(maxSubCalls)}`)
+            throw new Error(
+              `run_code exceeded maxSubCallsPerRun=${String(maxSubCalls)} (attempted dispatch ${String(n)}). `
+              + 'A run_code program may issue at most that many sub-call tool dispatches; reduce its tool calls by batching with grep/glob, '
+              + 'narrowing the scan scope, or splitting the work across several run_code calls. '
+              + 'Raise maxSubCallsPerRun in the tools config to allow more.',
+            )
+          }
           const subCallId = brandString<ToolCallId>(`${String(exec.callId)}:ptc:${n}`)
           const input = {
             callId: subCallId,
