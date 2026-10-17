@@ -29,6 +29,11 @@ export interface MessageIconActionsProps {
    */
   extraActions?: ReactNode
   /**
+   * Meta content appended inside the clock label after the run-time facts
+   * (the plugin-provided stat line); omitted for user chrome.
+   */
+  afterClock?: ReactNode
+  /**
    * Icon-row Turn-usage trigger (the TurnUsagePanel pill), seated after the
    * branch control at the end of the icon cluster.
    */
@@ -44,7 +49,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, clock, onBranch, branchUnavailable = false, className,
-  extraActions, usageAction, t,
+  extraActions, afterClock, usageAction, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -83,7 +88,7 @@ export function MessageIconActions({
         <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
       )}
       {clock === 'end'
-        ? <span className={css.endInfo}>{usageAction}{clockEl}</span>
+        ? <span className={css.endInfo}>{usageAction}{clockEl}{afterClock}</span>
         : usageAction}
     </div>
   )
