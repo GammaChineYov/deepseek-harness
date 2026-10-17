@@ -285,6 +285,7 @@ type ToolOwner = Pick<ChatNodeOwnerProps, 'openFile' | 'inspectCall'> & {
 const renderCommandSlot: React.ComponentProps<typeof CommandNodeView>['renderSlot'] =
   (_key, _owner, opts) => opts?.fallback ?? null
 const renderTurnTailSlot: React.ComponentProps<typeof TurnTailNodeView>['renderSlot'] = () => null
+const renderTurnTailChain: React.ComponentProps<typeof TurnTailNodeView>['renderSlotChain'] = () => null
 
 function HarnessChatFlow({ standard, owner, hookContext, renderSlot, useConnectionState }: {
   readonly standard: HarnessStandardProps
@@ -357,7 +358,8 @@ function HarnessChatNode({
       return <SystemPromptNodeView {...nodeProps} node={owner.node} />
     case 'turn-tail':
       return <TurnTailNodeView {...nodeProps} node={owner.node}
-        usePerformanceUsage={usePerformanceUsage} renderSlot={renderTurnTailSlot} />
+        usePerformanceUsage={usePerformanceUsage} renderSlot={renderTurnTailSlot}
+        renderSlotChain={renderTurnTailChain} />
     case 'unknown':
       return <UnknownNodeView {...nodeProps} node={owner.node} />
     case 'tool-call': {
