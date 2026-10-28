@@ -31,9 +31,12 @@ Add this row to a composition with `dsh-tools` mounted. The nearest scoped execu
 - name: '@deepseek-ai/dsh-tool-executor-ptc'
   config:
     maxParallelSubCalls: 10
+    maxSubCallsPerRun: 2000
 ```
 
 Root `run_code` calls are exclusive and execute serially. `maxParallelSubCalls` limits parallel-safe nested calls within each program and defaults to `10`; it must be a positive integer, with `1` selecting serial execution. Exclusive calls form barriers.
+
+`maxSubCallsPerRun` bounds the sub-call tool dispatches one program may issue and defaults to `2000`. A program that exceeds it is aborted with an error naming the limit; raise it when a legitimate program needs more.
 
 This package declares `ctx.ptcRuntime` and `ctx.systemPrompt` as required injections; Agent-owned programs need `ctx.workingDirectory`. The executor activates only after its runtime is available and withdraws when that runtime unloads. An enabled PTC executor without a runtime stops application startup. A withdrawn PTC selection never falls back to native execution.
 

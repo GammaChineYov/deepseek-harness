@@ -3987,13 +3987,15 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-executor-ptc`
 
 - `inject`: `tools` · `systemPrompt` · `ptcRuntime`
-- `source`: [`packages/core/tool-executor-ptc/src/config.ts:5`](../packages/core/tool-executor-ptc/src/config.ts)
+- `source`: [`packages/core/tool-executor-ptc/src/config.ts:8`](../packages/core/tool-executor-ptc/src/config.ts)
 
 ```ts config-catalog
 /** Program execution limits. */
 export interface Config {
   /** Maximum overlapping concurrency-safe program subcalls. */
   maxParallelSubCalls: number
+  /** Sub-dispatch budget for one program; exceeding it aborts that program. */
+  maxSubCallsPerRun: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-executor-ptc -->

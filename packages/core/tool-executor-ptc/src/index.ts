@@ -21,10 +21,13 @@ export class PtcExecutor implements ToolExecutor {
   readonly sections: readonly ToolPromptSection[]
   private readonly pipeline: ToolExecutionPipeline
   private readonly maxParallelSubCalls: number
+  private readonly maxSubCallsPerRun: number
   private ptcTransport: ToolDefinition | undefined
 
   constructor(private readonly ctx: Context, config: Partial<Config> = {}, private readonly maxParallel: () => number = () => 10) {
-    this.maxParallelSubCalls = Config(config).maxParallelSubCalls
+    const limits = Config(config)
+    this.maxParallelSubCalls = limits.maxParallelSubCalls
+    this.maxSubCallsPerRun = limits.maxSubCallsPerRun
     const tools = ctx.tools
     this.sections = [
       { name: 'tools:ptc-only', order: ctx.systemPrompt.getSectionOrder('PTC_ONLY'), text: PTC_ONLY_INSTRUCTION, interpolate: false },
@@ -57,7 +60,7 @@ export class PtcExecutor implements ToolExecutor {
 
   /** Keep the reserved transport outside registered capabilities and their restrictions. */
   private requirePtcTransport(): ToolDefinition {
-    this.ptcTransport ??= createRunCodeTool(this.ctx, this.pipeline, this.maxParallelSubCalls)
+    this.ptcTransport ??= createRunCodeTool(this.ctx, this.pipeline, this.maxParallelSubCalls, this.maxSubCallsPerRun)
     return this.ptcTransport
   }
 }

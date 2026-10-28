@@ -31,9 +31,12 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-tool-executor-ptc'
   config:
     maxParallelSubCalls: 10
+    maxSubCallsPerRun: 2000
 ```
 
 根 `run_code` 调用是独占调用，按串行执行。`maxParallelSubCalls` 限制每个程序中并行安全的嵌套调用数，默认值为 `10`；值必须是正整数，`1` 表示串行执行。独占调用构成屏障。
+
+`maxSubCallsPerRun` 限制单个程序可发出的子调用工具分派次数，默认值为 `2000`。超出预算的程序会以指明该限额的错误终止；确有需要时提高该值。
 
 本包将 `ctx.ptcRuntime` 和 `ctx.systemPrompt` 声明为必需注入；带 Agent 的程序要求 `ctx.workingDirectory`。执行器在运行时可用后才激活，并在运行时卸载时撤回。启用 PTC 执行器但未提供运行时会阻止应用启动。已撤回的 PTC 选择不会回退到原生执行。
 
