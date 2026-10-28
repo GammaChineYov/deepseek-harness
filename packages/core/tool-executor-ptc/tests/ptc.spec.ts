@@ -66,6 +66,7 @@ class FakeRuntime extends PtcRuntime {
 interface SetupOptions {
   mode?: 'native' | 'ptc'
   maxParallelSubCalls?: number
+  maxSubCallsPerRun?: number
   runtime?: false | { language?: string }
   toolOrder?: string[]
 }
@@ -75,7 +76,10 @@ async function setup(options: SetupOptions = {}) {
   provideWorkingDirectoryFixture(ctx)
   await ctx.plugin(SystemPrompt, { ...options.toolOrder ? { toolOrder: options.toolOrder } : {} })
   await ctx.plugin(ToolRuntime)
-  const executor = options.mode === 'native' ? new NativeToolExecutor(ctx) : new PtcExecutor(ctx, { ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {} })
+  const executor = options.mode === 'native' ? new NativeToolExecutor(ctx) : new PtcExecutor(ctx, {
+    ...options.maxParallelSubCalls !== undefined ? { maxParallelSubCalls: options.maxParallelSubCalls } : {},
+    ...options.maxSubCallsPerRun !== undefined ? { maxSubCallsPerRun: options.maxSubCallsPerRun } : {},
+  })
   ctx.tools.setExecutor(executor)
   let runtime: FakeRuntime | undefined
   if (options.runtime !== false) {
@@ -271,6 +275,30 @@ describe('mode-aware wire contribution', () => {
 
   it('rejects a non-positive PTC concurrency limit in configuration', () => {
     expect(() => PtcToolExecutor.Config({ maxParallelSubCalls: 0 })).toThrow()
+  })
+
+  it('rejects a non-positive sub-dispatch budget in configuration', () => {
+    expect(() => PtcToolExecutor.Config({ maxSubCallsPerRun: 0 })).toThrow()
+    expect(() => new PtcExecutor(new Context(), { maxSubCallsPerRun: 0 })).toThrow('maxSubCallsPerRun')
+  })
+
+  it('aborts a program that exceeds its sub-dispatch budget', async () => {
+    const { ctx, runtime } = await setup({ mode: 'ptc', maxSubCallsPerRun: 2 })
+    const calls = registerEcho(ctx)
+    runtime.behavior = async (request) => {
+      const echo = request.bindings[0]!.functions.echo!
+      await echo({ value: 'one' })
+      await echo({ value: 'two' })
+      const message = await echo({ value: 'three' })
+        .then(() => 'dispatched', (error: unknown) => error instanceof Error ? error.message : String(error))
+      return { logs: [], value: message }
+    }
+    const result = await runCode(ctx, 'program')
+    expect(result.content[0]).toEqual({
+      type: 'text',
+      text: expect.stringContaining('maxSubCallsPerRun=2'),
+    })
+    expect(calls).toEqual([{ value: 'one' }, { value: 'two' }])
   })
 
   it.each([

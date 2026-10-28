@@ -268,12 +268,14 @@ function resolveSandboxPolicy(ctx: Context, exec: ToolRunContext): SandboxExecut
  * @param ctx - executor context owning policy listeners and active program cleanup.
  * @param executor - shared invocation pipeline for nested calls.
  * @param maxParallel - maximum overlapping concurrency-safe subcalls.
+ * @param maxSubCalls - sub-dispatch budget for one program.
  * @returns the transport definition with runtime-dependent schema text.
  */
 export function createRunCodeTool(
   ctx: Context,
   executor: ToolExecutionPipeline,
   maxParallel: number,
+  maxSubCalls: number,
 ): ToolDefinition {
   // Retain services for log settlement after the executor context becomes inactive.
   const tools = ctx.tools
@@ -506,6 +508,15 @@ export function createRunCodeTool(
           }
           const normalized = jsonNormalizeArgs(rawArgs)
           const n = ++dispatches
+          if (n > maxSubCalls) {
+            runController.abort(`run_code exceeded its per-run sub-dispatch budget of ${String(maxSubCalls)}`)
+            throw new Error(
+              `run_code exceeded maxSubCallsPerRun=${String(maxSubCalls)} (attempted dispatch ${String(n)}). `
+              + 'A run_code program may issue at most that many sub-call tool dispatches; reduce its tool calls by batching with grep/glob, '
+              + 'narrowing the scan scope, or splitting the work across several run_code calls. '
+              + 'Raise maxSubCallsPerRun in the executor config to allow more.',
+            )
+          }
           const subCallId = brandString<ToolCallId>(`${String(exec.callId)}:ptc:${n}`)
           const input = {
             callId: subCallId,
