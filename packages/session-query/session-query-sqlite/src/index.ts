@@ -4,7 +4,7 @@
  * @module @deepseek-ai/dsh-session-query-sqlite
  */
 
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { SESSION_FORMAT_VERSION, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { DatabaseSync } from 'node:sqlite'
 import { Context, Service, type Fiber } from '@deepseek-ai/cordis'
@@ -58,6 +58,7 @@ import {
   sanitizeFtsText,
   SQLITE_MAX_PAGE_LIMIT,
 } from './query.ts'
+import { fingerprintSessionLog } from './fingerprint.ts'
 
 export {
   SESSION_QUERY_SQLITE_APPLICATION_ID,
@@ -884,9 +885,7 @@ function observeSession(
     header: detachedHeader,
     inheritedEventCount,
     documents: buildSessionEventSearchDocuments(detachedHeader.id, detachedEvents),
-    fingerprint: createHash('sha256')
-      .update(JSON.stringify({ header: detachedHeader, inheritedEventCount, events: detachedEvents }))
-      .digest('base64url'),
+    fingerprint: fingerprintSessionLog(detachedHeader, inheritedEventCount, detachedEvents),
   }
 }
 
