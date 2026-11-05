@@ -132,6 +132,7 @@
             name: '@deepseek-ai/dsh-tool-skill'
             config:
               excludedSkills: [official-plugins, personalized-pages]
+              catalogDescriptionMaxLength: 149
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
           - id: tool-plugin-manager
