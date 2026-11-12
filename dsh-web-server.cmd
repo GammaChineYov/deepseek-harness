@@ -19,6 +19,10 @@ rem pnpm scripts resolve the expected node build
 for /f "delims=" %%v in ('type "C:\Users\Landrom\.workbuddy\binaries\node\versions\current"') do set "WB_NODEVER=%%v"
 set "PATH=C:\Users\Landrom\.workbuddy\binaries\node\versions\%WB_NODEVER%;%PATH%"
 set "WB_NODE=C:\Users\Landrom\.workbuddy\binaries\node\versions\%WB_NODEVER%\node.exe"
+rem LLM 出口绕开本地代理（mihomo 7897 到 api.deepseek.com 实测 ~20% TLS 断流；
+rem 直连 9-10/10 成功）；Node env 代理机制尊重 NO_PROXY。
+set "NO_PROXY=127.0.0.1,localhost,::1,api.deepseek.com,.deepseek.com"
+set "no_proxy=%NO_PROXY%"
 "%WB_NODE%" "C:\Users\Landrom\.workbuddy\binaries\node\workspace\node_modules\pnpm\bin\pnpm.cjs" dsh web
 pause
 exit /b 0
