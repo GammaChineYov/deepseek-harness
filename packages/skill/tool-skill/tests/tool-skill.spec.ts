@@ -1168,6 +1168,32 @@ describe('user-explicit invocation injection', () => {
     expect(block.text).not.toContain('what does this do')
   })
 
+  it('mounts only the user gesture when model invocation is disabled', async () => {
+    const home = await tempDir('invoke-user-only')
+    const skillsRoot = join(home, '.agents', 'skills')
+    await writePolicySkill(skillsRoot, 'hidden-demo', 'User-only demo', 'disable-model-invocation: true', 'Say the magic word: PINEAPPLE.')
+    const ctx = await setup(home, { modelInvocation: false })
+    const agent = agentForCwd(home)
+
+    // The model-facing half is absent: no tool schema, no catalog message.
+    expect(ctx.tools.schemas()).toEqual([])
+    const plain = await proposeStep(ctx, agent, [gesture('plain request')])
+    if (plain.kind !== 'enter') throw new Error('expected enter')
+    expect(plain.messages.map(message => (message.source as { kind: string }).kind)).toEqual(['user'])
+
+    // The user gesture still loads the skill body on demand.
+    const decision = await proposeStep(ctx, agent, [gesture('/hidden-demo what does this do')])
+    if (decision.kind !== 'enter') throw new Error('expected enter')
+    expect(decision.messages.map(message => (message.source as { kind: string }).kind))
+      .toEqual(['user', 'skill-invocation'])
+    const injection = decision.messages.at(-1)!
+    expect(injection.source).toMatchObject({ kind: 'skill-invocation', name: 'hidden-demo', form: 'instructions' })
+    const block = injection.content[0]
+    if (block?.type !== 'text') throw new Error('expected text injection')
+    expect(block.text).toContain('<skill_content name="hidden-demo">')
+    expect(block.text).toContain('Say the magic word: PINEAPPLE.')
+  })
+
   it('injects an ordinary skill the same way (one uniform user-explicit path)', async () => {
     const { ctx, agent } = await invokeHarness()
     const decision = await proposeStep(ctx, agent, [gesture('/shared-skill go')])

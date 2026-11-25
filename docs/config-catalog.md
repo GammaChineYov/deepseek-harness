@@ -3613,7 +3613,7 @@ export interface Config {
 
 - `inject`: `sessions` · `sessionProjections`
 - `refs`: [`SessionQueryConfig`](../packages/session-query/session-query/src/index.ts)
-- `source`: [`packages/session-query/session-query-sqlite/src/index.ts:92`](../packages/session-query/session-query-sqlite/src/index.ts)
+- `source`: [`packages/session-query/session-query-sqlite/src/index.ts:93`](../packages/session-query/session-query-sqlite/src/index.ts)
 
 ```ts config-catalog
 /** Combined session-query configuration backed by SQLite full-text search. */
@@ -5003,7 +5003,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-tool-skill`
 
 - `inject`: `agents` · `tools` · `skills` · `workingDirectory`
-- `source`: [`packages/skill/tool-skill/src/index.ts:65`](../packages/skill/tool-skill/src/index.ts)
+- `source`: [`packages/skill/tool-skill/src/index.ts:66`](../packages/skill/tool-skill/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing skill catalog configuration. */
@@ -5012,6 +5012,14 @@ export interface Config {
   catalogDescriptionMaxLength?: number
   /** Exact skill names omitted from this tool's catalog, named loads and user invocations. */
   excludedSkills?: string[]
+  /**
+   * Whether this preset mounts the model-facing half: the `skill` loader tool
+   * and its durable session catalog. `false` keeps only the user-explicit
+   * `/name` gesture, so a preset that must not model-invoke skills — the
+   * shipped minimal preset, whose tool set is one persistent shell — still
+   * loads a skill the user picks from the input's `/` menu. Defaults to true.
+   */
+  modelInvocation?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-skill -->

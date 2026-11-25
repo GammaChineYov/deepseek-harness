@@ -1,5 +1,7 @@
 /**
- * Durable session skill catalog and model-facing `skill` loader tool.
+ * Durable session skill catalog, model-facing `skill` loader tool, and the
+ * user-explicit `/name` load gesture. `modelInvocation: false` mounts only the
+ * gesture, for presets whose model tool set must stay skill-free.
  *
  * @module @deepseek-ai/dsh-tool-skill
  */
@@ -67,12 +69,21 @@ export interface Config {
   catalogDescriptionMaxLength?: number
   /** Exact skill names omitted from this tool's catalog, named loads and user invocations. */
   excludedSkills?: string[]
+  /**
+   * Whether this preset mounts the model-facing half: the `skill` loader tool
+   * and its durable session catalog. `false` keeps only the user-explicit
+   * `/name` gesture, so a preset that must not model-invoke skills — the
+   * shipped minimal preset, whose tool set is one persistent shell — still
+   * loads a skill the user picks from the input's `/` menu. Defaults to true.
+   */
+  modelInvocation?: boolean
 }
 
 /** Validate and default the model-facing skill catalog configuration. */
 export const Config: z<Config> = z.object({
   catalogDescriptionMaxLength: z.number().default(DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH),
   excludedSkills: z.array(z.string()).default([]),
+  modelInvocation: z.boolean().default(true),
 })
 
 /**
@@ -80,10 +91,14 @@ export const Config: z<Config> = z.object({
  * durable session catalog. The catalog is emitted only when the calling agent
  * resolves this plugin's exact tool registration; a restriction or scoped
  * same-name shadow therefore removes both the schema and its call guidance.
+ * With `modelInvocation: false` neither the tool nor the catalog is mounted,
+ * while the user-explicit `/name` gesture below stays active: opening a skill
+ * by hand is a user decision, independent of what the model may invoke.
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const catalogDescriptionMaxLength = config.catalogDescriptionMaxLength ?? DEFAULT_CATALOG_DESCRIPTION_MAX_LENGTH
   assertPositiveInteger('catalogDescriptionMaxLength', catalogDescriptionMaxLength, 3)
+  const modelInvocation = config.modelInvocation ?? true
 
   const excludedSkills = new Set(config.excludedSkills)
   for (const name of excludedSkills) {
@@ -171,7 +186,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       return { card: 'generic', title: `Load skill ${args.name}`, kind: 'read', rawInput: args.name }
     },
   })
-  ctx.tools.register(skillTool)
+  if (modelInvocation) ctx.tools.register(skillTool)
 
   // User-explicit skill invocation: a claimed user message whose first line
   // starts with `/<name>` naming a user-invocable skill is a deterministic
@@ -223,6 +238,11 @@ export function apply(ctx: Context, config: Config = {}): void {
   // a lookup of its own name: `register()` files into the CALLING context's
   // scope, so a plugin mounted inside an agent preset registers for that agent
   // alone and an unscoped lookup correctly finds nothing.
+  //
+  // `modelInvocation: false` skips this listener entirely: with no `skill`
+  // tool there is no model-side catalog to publish, and the user gesture above
+  // resolves the body of the skill the user picked.
+  if (!modelInvocation) return
   ctx.on('agent/pre-step', async (
     { agent, signal },
     next,

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Agents can discover and load skills during a session. When the `skill` tool is visible, model-invocable skills or incomplete discovery produce a durable catalog before the first request. The tool loads full instructions; users can invoke user-invocable skills with `/name`. Entry, visibility, and completeness changes append a replacement catalog. Incomplete discovery publishes confirmed skills with a warning, including when none are confirmed. Configure `catalogDescriptionMaxLength` to cap descriptions.
+Agents can discover and load skills during a session. When the `skill` tool is visible, model-invocable skills or incomplete discovery produce a durable catalog before the first request. The tool loads full instructions; users can invoke user-invocable skills with `/name`. Entry, visibility, and completeness changes append a replacement catalog. Incomplete discovery publishes confirmed skills with a warning, including when none are confirmed. Configure `catalogDescriptionMaxLength` to cap descriptions. Set `modelInvocation: false` to mount only the `/name` gesture, for a preset whose requests must carry neither the tool schema nor the catalog.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Use it when agents should discover and load skills during a session. Skip it whe
 
 ### Mount and configure
 
-Load the plugin together with the skill registry and at least one provider. The only configuration caps the normalized description length rendered in the catalog.
+Load the plugin together with the skill registry and at least one provider. The only mount-time choice is whether the model-facing half exists; one configuration field caps the normalized description length rendered in the catalog.
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill'
@@ -47,8 +47,11 @@ Load the plugin together with the skill registry and at least one provider. The 
 |---|---|---|
 | `catalogDescriptionMaxLength` | `500` | Maximum normalized description length rendered in the session catalog; minimum 3 |
 | `excludedSkills` | `[]` | Exact skill names this tool omits from the session catalog, named loads and user `/name` invocations |
+| `modelInvocation` | `true` | Mount the `skill` tool and its catalog. `false` keeps only user-explicit `/name` loading: no tool schema and no catalog message, so the preset's request shape is unchanged until a user picks a skill |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-skill) is the exhaustive source for every accepted field.
+
+The shipped Web `minimal` preset uses the second field's off state: it mounts `skill-filesystem` for the input's `/` menu and `tool-skill` with `modelInvocation: false`, so a hand-picked skill still loads while the preset's requests keep their single-tool shape.
 
 ### What the model gets
 
@@ -87,7 +90,7 @@ At each eligible `agent/pre-step`, the plugin snapshots the calling session's sk
 
 ### Invocation boundary
 
-The `/name` gesture listener scans only claimed user messages: a whitespace-bounded token naming a user-invocable skill in the workspace catalog injects the same `<skill_content>` rendering as a `user`-role instructions context appended after every other injection. Unknown names and user-disabled skills stay ordinary prose. This is the only entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose.
+The `/name` gesture listener scans only claimed user messages: a whitespace-bounded token naming a user-invocable skill in the workspace catalog injects the same `<skill_content>` rendering as a `user`-role instructions context appended after every other injection. Unknown names and user-disabled skills stay ordinary prose. This is the only entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose. It is registered unconditionally: with `modelInvocation: false` the tool and the catalog listener are skipped, and this gesture is the whole plugin, resolving the skill body at step time against the registry scope of the calling agent.
 
 </details>
 

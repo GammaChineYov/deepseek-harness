@@ -21,6 +21,17 @@
               readImage: true
               write: false
               edit: false
+          # User-explicit skill loading. Discovery feeds the input's `/` menu,
+          # and `modelInvocation: false` keeps the model-facing half off: no
+          # `skill` tool schema and no skill catalog enter this preset's
+          # requests, so its one-tool contract survives. A pick still loads the
+          # skill through the host pre-step gesture.
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+            config:
+              modelInvocation: false
           - id: compaction
             name: cordis:group
             group: true

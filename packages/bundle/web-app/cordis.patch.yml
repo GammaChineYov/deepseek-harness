@@ -583,7 +583,11 @@
 # merged catalog its scope chain selects. Only the per-agent rows move behind
 # presets: the base host `skill-filesystem` row is disabled here (presets own local
 # discovery), and `tool-skill` is what a preset mounts to give its agent the
-# catalog and loader at all.
+# catalog and loader at all. A preset that must not model-invoke skills still
+# mounts both rows and turns only the model-facing half off
+# (`tool-skill.modelInvocation: false`): discovery feeds the input's `/` menu,
+# and the plugin's user-explicit `/name` gesture loads the picked skill without
+# publishing a catalog or a tool schema — the `minimal` preset's shape.
 
 - id: skill-filesystem
   disabled: true

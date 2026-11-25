@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时，只要存在模型可调用的 skill 或发现不完整，就会在首次请求前生成持久目录。工具加载完整指令；用户可以用 `/name` 调用用户可调用的 skill。条目、可见性和完整性变化会追加替换目录。发现不完整时会发布已确认的 skill 并附带警告，即使没有确认任何 skill。可配置 `catalogDescriptionMaxLength` 来限制描述长度。
+agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时，只要存在模型可调用的 skill 或发现不完整，就会在首次请求前生成持久目录。工具加载完整指令；用户可以用 `/name` 调用用户可调用的 skill。条目、可见性和完整性变化会追加替换目录。发现不完整时会发布已确认的 skill 并附带警告，即使没有确认任何 skill。可配置 `catalogDescriptionMaxLength` 来限制描述长度。把 `modelInvocation` 设为 `false` 则只挂载 `/name` 手势，用于请求中不得出现该工具 schema 与目录的 preset。
 
 ## 目录
 
@@ -35,7 +35,7 @@ agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时�
 
 ### 挂载与配置
 
-与 skill 注册表和至少一个提供方一起加载该插件。唯一配置项限制目录中渲染的规范化描述长度。
+与 skill 注册表和至少一个提供方一起加载该插件。挂载时唯一的选择是面向模型的那半边要不要存在；一个配置项限制目录中渲染的规范化描述长度。
 
 ```yaml
 - name: '@deepseek-ai/dsh-skill'
@@ -47,8 +47,11 @@ agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时�
 |---|---|---|
 | `catalogDescriptionMaxLength` | `500` | 会话目录中渲染的规范化描述最大长度；最小为 3 |
 | `excludedSkills` | `[]` | 此工具按确切名称排除的 Skill，对会话目录、按名加载和用户的 `/name` 调用均生效 |
+| `modelInvocation` | `true` | 挂载 `skill` 工具及其目录。`false` 只保留用户显式 `/name` 加载：不注册工具 schema，也不发布目录消息，因此在用户选中 skill 之前，preset 的请求形态不变 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-skill)是每个受支持字段的穷尽式真源。
+
+随发行版交付的 Web `minimal` preset 用的就是第二个字段的关闭态：它挂载 `skill-filesystem` 以提供输入框的 `/` 菜单，并以 `modelInvocation: false` 挂载 `tool-skill`，因此手动选中的 skill 仍会加载，而该 preset 的请求保持单工具形态。
 
 ### 模型得到什么
 
@@ -87,7 +90,7 @@ agent 可以在会话期间发现并加载 skill。当 `skill` 工具可见时�
 
 ### 调用边界
 
-`/name` 手势监听器只扫描已认领的用户消息：若某个以空白为界、指名工作区目录中用户可调用 skill 的 token 出现，则把同一份 `<skill_content>` 渲染作为 `user` 角色的指令上下文注入，追加在该步骤所有其他注入之后。未知名称与用户不可调用的名称保持为普通行文。这是 `disable-model-invocation` skill 唯一的入口，目录与 `skill` 工具永不暴露这类 skill。
+`/name` 手势监听器只扫描已认领的用户消息：若某个以空白为界、指名工作区目录中用户可调用 skill 的 token 出现，则把同一份 `<skill_content>` 渲染作为 `user` 角色的指令上下文注入，追加在该步骤所有其他注入之后。未知名称与用户不可调用的名称保持为普通行文。这是 `disable-model-invocation` skill 唯一的入口，目录与 `skill` 工具永不暴露这类 skill。该监听器无条件注册：当 `modelInvocation: false` 时，工具与目录监听器被跳过，这个手势就是插件的全部，它在步骤时刻按调用 agent 的注册表层作用域解析 skill 正文。
 
 </details>
 
